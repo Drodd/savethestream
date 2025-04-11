@@ -2,8 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 游戏元素
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
-    const scoreElement = document.getElementById('score');
-    const timerElement = document.getElementById('timer');
+    const viewerCountElement = document.getElementById('viewer-count');
+    const timerProgressElement = document.getElementById('timer-progress');
+    const reputationValueElement = document.getElementById('reputation-value');
+    const starsContainer = document.getElementById('stars-container');
     const gameOverElement = document.getElementById('game-over');
     const finalScoreElement = document.getElementById('final-score');
     const restartButton = document.getElementById('restart-btn');
@@ -13,14 +15,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const commentsListElement = document.getElementById('comments-list');
     const zoomSlider = document.getElementById('zoom-slider');
     const zoomValueDisplay = document.getElementById('zoom-value');
+    const startScreen = document.getElementById('start-screen');
+    const startButton = document.getElementById('start-btn');
     
-    // 调试模式元素
-    const debugToggleButton = document.getElementById('debug-toggle');
-    const debugPanel = document.getElementById('debug-panel');
-    const levelInfoDisplay = document.getElementById('level-info');
-    const prevLevelButton = document.getElementById('prev-level');
-    const nextLevelButton = document.getElementById('next-level');
-    const resumeTimerButton = document.getElementById('resume-timer');
+    // 游戏UI元素数组，用于统一控制显示/隐藏
+    const gameUIElements = [
+        document.getElementById('ui-container'),
+        document.getElementById('timer-pie'),
+        document.getElementById('reputation-container'),
+        document.getElementById('zoom-slider-container'),
+        document.getElementById('comments-container')
+    ];
+    
+    // 隐藏游戏UI元素
+    function hideGameUI() {
+        gameUIElements.forEach(element => {
+            if (element) element.style.display = 'none';
+        });
+    }
+    
+    // 显示游戏UI元素
+    function showGameUI() {
+        gameUIElements.forEach(element => {
+            if (element) element.style.display = '';
+        });
+    }
+    
+    // 游戏启动时隐藏UI
+    hideGameUI();
     
     // 游戏变量
     let score = 0;
@@ -29,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let timeLeft = 10;
     let gameStarted = false;
     let gameOver = false;
+    let firstLaunch = true; // 添加一个变量跟踪是否是首次启动
     let bgOffsetX = 0;
     let bgOffsetY = 0;
     let isDragging = false;
@@ -47,8 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeComments = []; // 当前活跃的评论
     let scoreUpdateInterval = null; // 得分更新定时器
     let zoomLevel = 1.0; // 当前缩放级别
-    let isDebugMode = false; // 是否处于调试模式
-    let timerPaused = false; // 计时器是否暂停
     
     // 窗口尺寸和背景尺寸
     let windowWidth = window.innerWidth;
@@ -58,50 +79,61 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 网友昵称库
     const usernames = [
-        "星辰大海", "山水有情", "清风徐来", "云端漫步", "雨后彩虹", 
-        "明月清风", "花间一壶酒", "竹林深处", "海阔天空", "逍遥自在",
-        "梦想家", "心灵捕手", "夜空中最亮的星", "微风拂面", "岁月静好",
-        "温柔岁月", "光阴似箭", "雪落无声", "春暖花开", "秋水长天",
-        "落叶知秋", "沧海一粟", "日月如梭", "山高水长", "天涯海角",
-        "书香门第", "一叶知秋", "春风十里", "月光如水", "花好月圆",
-        "红尘滚滚", "白云苍狗", "青山绿水", "金玉满堂", "锦上添花",
-        "翰墨飘香", "诗情画意", "雅俗共赏", "天马行空", "妙笔生花",
-        "如火如荼", "风华正茂", "意气风发", "挥毫泼墨", "博古通今",
-        "才高八斗", "学富五车", "妙手回春", "浮生若梦", "七步成诗"
+        // 中文类昵称
+        "小王不姓王", "吃可爱长大的", "无敌小可爱", "一只小猫咪", "打工人007", 
+        "社畜搬砖中", "摸鱼中勿扰", "深夜吃货", "孤独的美食家", "吃饭第一名",
+        "可达鸭本鸭", "熬夜冠军", "南方小土豆", "摆烂小王子", "躺平中ing",
+        
+        // 英文类昵称
+        "ElonFan2023", "GoodGuy_404", "iPhoneUser", "GameMaster", "CoolDude123",
+        "MrBeast666", "BabyShark", "SweetDreams", "WildCat", "LOL_Player",
+        "StarbuckLover", "DogeCoin", "Web3Builder", "NFT_Collector", "SuperIron",
+        
+        // 中英结合类
+        "方狗Fanggo", "HI是小林", "Mike爱吃面", "小明Plus", "Tony今天不下雨",
+        "Lisa要努力", "Jack没长高", "小C超可爱", "大橙子Orange", "超甜Candy",
+        
+        // 网络热梗昵称
+        "真香警告", "柠檬精", "秃头少女", "打工魂", "肥宅不肥", 
+        "修勾李弯弯", "原神启动", "永远18岁", "韭菜本韭", "开摆摆烂烂",
+        "芝士雪豹", "我不是演员", "吹下去狗熊", "烤地瓜想吃", "内卷不止",
+        
+        // 保留一些原有的好昵称
+        "星辰大海", "微风拂面", "夜空中最亮的星", "浮生若梦", "云端漫步"
     ];
     
     // 评论内容库
     const commentTexts = [
-        "好厉害啊，学到了！",
-        "主播加油，支持你！",
-        "这个角度拍得真好看！",
-        "哇，这画面太美了吧！",
-        "主播声音真好听~",
-        "这个内容太精彩了！",
-        "请问这是哪里啊？好美！",
-        "主播太有才了，佩服佩服！",
-        "学到了，收藏了！",
-        "这个观点很独特，赞一个！",
-        "主播幽默风趣，太喜欢了！",
-        "这个视角真的很棒！",
-        "主播讲得真细致，很专业！",
-        "哈哈哈笑死我了！",
-        "这个内容对我帮助很大！",
-        "主播今天状态很好啊！",
-        "刚来，有人能介绍一下吗？",
-        "这个地方我也去过，确实不错！",
-        "主播分享得真及时，感谢！",
-        "刚刚错过了什么精彩内容吗？",
-        "顶起来！优质内容！",
-        "请问有回放吗？想再看一遍！",
-        "这个技巧我要学习一下！",
-        "好喜欢这种感觉~",
-        "主播太用心了，感动！",
-        "这个真的太有意思了！",
-        "每次看直播都能学到新东西！",
-        "请问主播更新频率是？",
-        "前排支持一下主播！",
-        "这个氛围感太棒了！"
+        "这家咖啡馆装修好有格调啊",
+        "窗边的光线真不错，拍照一定很上镜",
+        "好想去这种地方坐一下午",
+        "这家店在哪里？有人知道吗？",
+        "我上周刚去过，价格有点小贵",
+        "这种薄荷绿的墙面搭配木质装饰真舒服",
+        "又是别人的精致生活，羡慕了",
+        "主播镜头真稳，拍得真清晰",
+        "坐在窗边看书喝咖啡，想想就很惬意",
+        "这家店人均消费多少啊？",
+        "主播怎么又来这种网红店，能不能有点新意",
+        "拍得不错，就是背景音乐有点吵",
+        "这家店的面包好吃，咖啡一般般",
+        "大家看右边桌子上的花，好像是玫瑰？",
+        "今天直播间人好少啊，都去哪了？",
+        "请问主播今天是什么相机拍的？超清晰",
+        "这种小资情调我可消受不起",
+        "看起来好悠闲，我还在加班...",
+        "这种环境不适合工作，太舒适了会犯困",
+        "主播讲一下这家店的位置吧，想去打卡",
+        "这种复古风格的餐厅现在很流行啊",
+        "墙上的装饰画挺有意思的",
+        "旁边那对情侣好般配啊",
+        "我已经三年没坐下来好好喝杯咖啡了，工作太忙",
+        "这个角度拍的不错，有电影感",
+        "感觉灯光有点暗，是不是滤镜拉得有点狠",
+        "店里的装修风格很温馨，我喜欢这种氛围",
+        "这种地方周末肯定爆满，能找到座位吗？",
+        "主播胃口真好，我看到桌子上的面包了",
+        "不知道这里的咖啡怎么样，看起来很精致"
     ];
     
     // 每个关卡的绿色和红色评论库
@@ -109,16 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 第1关 (ID: 0) 的评论库
         {
             green: [
-                "这个女生也太漂亮了吧！",
-                "哇，颜值好高啊！",
-                "主播拍到的女生好好看！",
-                "这位小姐姐身材真好~",
-                "美女出镜，弹幕暴增！",
-                "这颜值简直逆天了！",
-                "主播镜头里的小姐姐真漂亮",
-                "这女生气质真好啊",
-                "好想认识这个女生啊",
-                "美女看过来！这边拍得更好！"
+                "这位小姐姐笑容真好看，给人感觉很治愈",
+                "窗边的光线把她照得好漂亮，整个人都在发光",
+                "请问主播认识这位女生吗？能不能介绍一下",
+                "我刚进来，这是女朋友吗？拍得真好看",
+                "有没有人觉得她长得有点像那个女明星？",
+                "她手里拿的是菜单吗？想看看这家店有什么特色",
+                "主播能不能问问她用的什么护肤品，皮肤也太好了",
+                "这种精致的女生应该是别人家的女朋友吧，哎",
+                "镜头里的女生气质真好，像是会讲很多故事的人",
+                "怎么又是只拍女生，咖啡店环境也拍一下啊"
             ],
             red: []
         },
@@ -288,16 +320,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 "主播镜头里的帅哥真高"
             ],
             red: [
-                "那个女生刚刚出糗了吧",
-                "哈哈哈她摔倒的样子太搞笑了",
-                "主播拍到女生尴尬瞬间",
-                "那位女士的表情太尴尬了",
-                "刚才那个女生出糗了好好笑",
-                "她应该很希望地上有条缝钻进去",
-                "这种出糗瞬间太真实了",
-                "幸好她自己也在笑，没那么尴尬",
-                "主播太坏了，拍到人家出糗",
-                "这个出糗瞬间也太真实了"
+                "哈哈哈巧克力爆了一身，这也太惨了",
+                "女孩子满脸巧克力的表情绝了，太真实了",
+                "导播拍得太及时了，刚好拍到甜点爆炸现场",
+                "这就是网红甜品的陷阱啊，又贵又容易翻车",
+                "服务员呢？赶紧来个善后，这一身怎么洗啊",
+                "看男生尴尬到抓头的样子，肯定是第一次约会",
+                "估计这家店得给免单了，不然差评肯定刷爆",
+                "这种社死现场我都不忍心看下去了，太惨了",
+                "女生：我的约会，我的妆，我的衣服，我的发型...",
+                "这一刻她的内心os：再也不相信网红甜点了！"
             ]
         },
         // 第9关 (ID: 8) 的评论库
@@ -476,8 +508,48 @@ document.addEventListener('DOMContentLoaded', () => {
     currentBgImage.onload = function() {
         bgWidth = currentBgImage.width;
         bgHeight = currentBgImage.height;
-        initGame();
+        
+        // 根据是否首次启动决定是显示开始屏幕还是直接初始化游戏
+        if (firstLaunch) {
+            setupStartScreen();
+        } else {
+            initGame();
+        }
     };
+    
+    // 设置开始屏幕
+    function setupStartScreen() {
+        // 设置画布大小为图片实际大小
+        canvas.width = bgWidth;
+        canvas.height = bgHeight;
+        
+        // 绘制第一关背景
+        ctx.drawImage(currentBgImage, 0, 0, bgWidth, bgHeight);
+        
+        // 显示开始屏幕
+        startScreen.style.display = 'flex';
+        
+        // 隐藏游戏UI
+        hideGameUI();
+        
+        // 添加开始按钮点击事件
+        startButton.addEventListener('click', startGame, { once: true });
+    }
+    
+    // 开始游戏
+    function startGame() {
+        // 隐藏开始屏幕
+        startScreen.style.display = 'none';
+        
+        // 显示游戏UI
+        showGameUI();
+        
+        // 标记游戏已启动过
+        firstLaunch = false;
+        
+        // 初始化游戏
+        initGame();
+    }
     
     // 初始化游戏
     function initGame() {
@@ -487,6 +559,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 初始设置
         gameOver = false;
+        
+        // 初始化UI元素
+        updateScore(); // 更新观看人数和商家声誉显示
+        updateTimer(); // 更新倒计时进度条
         
         // 应用当前关卡的初始偏移量和缩放
         const currentConfig = levelConfigs[currentLevelId];
@@ -564,7 +640,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`初始化游戏 - 当前关卡ID: ${currentLevelId}, 关卡计数: ${levelCount}`);
         
         // 重置UI元素
-        redTimeIndicator.style.width = '0px';
         redTimeIndicator.style.display = 'none';
         branchIndicator.style.display = 'none';
         
@@ -574,9 +649,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 开始评论生成
             startComments();
-        } else {
-            // 如果已有评论，只添加一条系统消息
-            addSpecialComment("游戏重新开始");
         }
         
         // 设置当前关卡的矩形位置
@@ -620,12 +692,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, getRandomCommentInterval());
     }
     
-    // 获取随机评论时间间隔(0.5秒到2秒)
+    // 获取随机评论时间间隔
     function getRandomCommentInterval() {
-        return Math.floor(Math.random() * 1500) + 500; // 500ms到2000ms之间
+        return Math.floor(Math.random() * 2000) + 800; // 800ms到2800ms之间
     }
     
-    // 添加新评论
+    // 添加普通评论
     function addNewComment() {
         // 随机选择用户名和评论内容
         const username = usernames[Math.floor(Math.random() * usernames.length)];
@@ -644,7 +716,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 创建评论文本元素
         const textElement = document.createElement('span');
         textElement.className = 'text';
-        textElement.textContent = commentText;
+        textElement.textContent = ' ' + commentText; // 添加空格分隔
+        
+        // 根据评论库设置文本颜色
+        const currentLevelComments = levelComments[currentLevelId] || { green: [], red: [] };
+        if (currentLevelComments.red && currentLevelComments.red.includes(commentText)) {
+            textElement.style.color = '#ff6666'; // 红色评论库
+        } else if (currentLevelComments.green && currentLevelComments.green.includes(commentText)) {
+            textElement.style.color = '#66ff66'; // 绿色评论库
+        }
+        
         commentElement.appendChild(textElement);
         
         // 添加到评论列表
@@ -653,8 +734,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 将新评论添加到活跃评论数组
         activeComments.push(commentElement);
         
-        // 如果评论超过10条，移除最旧的
-        if (activeComments.length > 10) {
+        // 如果评论超过6条，移除最旧的
+        if (activeComments.length > 6) {
             const oldestComment = activeComments.shift();
             if (oldestComment.parentNode === commentsListElement) {
                 commentsListElement.removeChild(oldestComment);
@@ -674,14 +755,22 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 计算所有评论的总高度
         comments.forEach(comment => {
-            totalHeight += comment.offsetHeight + 8; // 高度加上margin-bottom
+            totalHeight += comment.offsetHeight + 6; // 评论高度 + margin-bottom
         });
         
         // 只有当评论总高度超过容器高度时才滚动
         if (totalHeight > commentsListElement.offsetHeight) {
             const scrollDistance = totalHeight - commentsListElement.offsetHeight;
+            
+            // 添加平滑过渡
             comments.forEach(comment => {
+                comment.style.transition = 'transform 0.5s ease-out';
                 comment.style.transform = `translateY(-${scrollDistance}px)`;
+            });
+        } else {
+            // 如果评论没有超出容器，确保重置所有评论的位置
+            comments.forEach(comment => {
+                comment.style.transform = 'translateY(0)';
             });
         }
     }
@@ -769,7 +858,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 检查是否需要等待分支图片加载完成
                 if (branchImageLoaded || !currentConfig.nextBranchId || currentConfig.nextBranchId === -1) {
-                    showSceneTransition();
+                    // 不再触发场景切换提示，保持静默预加载
+                    // 原代码: showSceneTransition();
                 }
             };
             nextBgImage.src = nextNormalConfig.bgImage;
@@ -786,7 +876,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 只有正常关卡图片也加载完成才显示提示
                 if (nextImageLoaded) {
-                    showSceneTransition();
+                    // 不再触发场景切换提示，保持静默预加载
+                    // 原代码: showSceneTransition();
                 }
             };
             branchBgImage.src = nextBranchConfig.bgImage;
@@ -803,157 +894,196 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 显示场景切换提示
     function showSceneTransition() {
+        // 不再显示提示消息，场景预加载功能保留
+        // 原代码: sceneTransitionElement.style.display = 'block';
+        // 不执行任何操作，静默预加载
+    }
+    
+    // 新增全屏遮罩转场动画函数
+    function showTransitionMask(callback) {
+        // 设置遮罩为黑色全屏，渐入渐出
+        sceneTransitionElement.textContent = '';  // 移除提示文字
+        sceneTransitionElement.style.backgroundColor = 'rgba(0, 0, 0, 1)';
         sceneTransitionElement.style.display = 'block';
+        sceneTransitionElement.style.top = '0';
+        sceneTransitionElement.style.left = '0';
+        sceneTransitionElement.style.width = '100%';
+        sceneTransitionElement.style.height = '100%';
+        sceneTransitionElement.style.transform = 'none';
+        sceneTransitionElement.style.transition = 'opacity 0.5s ease-in-out';
+        sceneTransitionElement.style.padding = '0';
+        sceneTransitionElement.style.opacity = '0';
+        
+        // 强制浏览器重绘
+        sceneTransitionElement.offsetHeight;
+        
+        // 开始淡入
+        sceneTransitionElement.style.opacity = '1';
+        
+        // 淡入完成后执行场景切换
         setTimeout(() => {
-            sceneTransitionElement.style.display = 'none';
-        }, 2000);
+            // 执行回调函数（场景切换）
+            if (callback) callback();
+            
+            // 场景切换后开始淡出
+            setTimeout(() => {
+                sceneTransitionElement.style.opacity = '0';
+                // 完全淡出后隐藏元素
+                setTimeout(() => {
+                    sceneTransitionElement.style.display = 'none';
+                }, 500);
+            }, 200); // 给切换留一点时间
+        }, 500); // 淡入时间为0.5秒
     }
     
     // 切换到下一张背景图片
     function switchToNextImage() {
         if (nextImageLoaded && (branchImageLoaded || !levelConfigs[currentLevelId].nextBranchId)) {
-            // 获取当前关卡配置
-            const currentConfig = levelConfigs[currentLevelId];
-            
-            if (!currentConfig) {
-                console.error(`错误：未找到关卡${currentLevelId}的配置`);
-                return;
-            }
-            
-            // 记录切换前的关卡ID
-            const oldLevelId = currentLevelId;
-            
-            // 根据是否进入分支路径决定下一关的ID
-            if (willEnterBranch && currentConfig.nextBranchId !== undefined) {
-                nextLevelId = currentConfig.nextBranchId;
-                console.log(`进入分支关卡: 从${oldLevelId}到${nextLevelId}`);
+            // 显示全屏转场遮罩
+            showTransitionMask(() => {
+                // 在遮罩完全不透明时执行场景切换逻辑
                 
-                // 检查是否结束游戏
-                if (nextLevelId === -1) {
-                    addSpecialComment("即将结束游戏并结算");
-                    setTimeout(() => {
-                        endGame();
-                    }, 2000);
+                // 获取当前关卡配置
+                const currentConfig = levelConfigs[currentLevelId];
+                
+                if (!currentConfig) {
+                    console.error(`错误：未找到关卡${currentLevelId}的配置`);
                     return;
                 }
                 
-                // 使用分支关卡图片
-                currentBgImage.src = branchBgImage.src;
+                // 记录切换前的关卡ID
+                const oldLevelId = currentLevelId;
                 
-                // 添加特殊评论
-                addSpecialComment("进入分支关卡");
-            } else {
-                nextLevelId = currentConfig.nextNormalId;
-                console.log(`进入正常关卡: 从${oldLevelId}到${nextLevelId}`);
-                
-                // 检查是否结束游戏
-                if (nextLevelId === -1) {
-                    addSpecialComment("即将结束游戏并结算");
-                    setTimeout(() => {
-                        endGame();
-                    }, 2000);
-                    return;
-                }
-                
-                // 使用正常关卡图片
-                currentBgImage.src = nextBgImage.src;
-                
-                // 添加特殊评论
-                addSpecialComment("进入下一关卡");
-            }
-            
-            // 更新当前关卡ID
-            currentLevelId = nextLevelId;
-            console.log(`当前关卡ID已更新为: ${currentLevelId}, 关卡计数: ${levelCount}`); // 添加关卡计数信息
-            console.log(`保持观看人数: ${viewerCount}, 商家声誉: ${merchantReputation}`); // 记录保持的值
-            
-            // 重置当前评论库到基础评论库
-            currentCommentTexts = commentTexts;
-            
-            // 测试一下这个关卡的评论库是否存在
-            const newLevelComments = levelComments[currentLevelId];
-            if (newLevelComments) {
-                console.log(`已找到关卡${currentLevelId}的评论库:`, 
-                    `绿色评论库(${newLevelComments.green?.length || 0}条)`, 
-                    `红色评论库(${newLevelComments.red?.length || 0}条)`);
-            } else {
-                console.warn(`警告: 未找到关卡${currentLevelId}的评论库配置`);
-            }
-            
-            // 更新画布大小（如果新图片尺寸不同）
-            bgWidth = currentBgImage.width;
-            bgHeight = currentBgImage.height;
-            canvas.width = bgWidth;
-            canvas.height = bgHeight;
-            
-            // 应用当前关卡的初始焦距和偏移量
-            if (levelConfigs[currentLevelId]) {
-                // 先应用初始缩放
-                if (levelConfigs[currentLevelId].initialZoom) {
-                    zoomLevel = levelConfigs[currentLevelId].initialZoom;
-                    // 更新滑块显示
-                    zoomSlider.value = zoomLevel * 100;
-                    zoomValueDisplay.textContent = zoomLevel.toFixed(1) + 'x';
-                    // 设置缩放
-                    canvas.style.transform = `scale(${zoomLevel})`;
-                    canvas.style.transformOrigin = 'top left';
-                }
-                
-                // 计算缩放后的尺寸
-                const scaledWidth = bgWidth * zoomLevel;
-                const scaledHeight = bgHeight * zoomLevel;
-                
-                // 然后应用偏移量
-                if (levelConfigs[currentLevelId].initialOffset) {
-                    // 计算考虑缩放的偏移量
-                    bgOffsetX = levelConfigs[currentLevelId].initialOffset.x * zoomLevel;
-                    bgOffsetY = levelConfigs[currentLevelId].initialOffset.y * zoomLevel;
+                // 根据是否进入分支路径决定下一关的ID
+                if (willEnterBranch && currentConfig.nextBranchId !== undefined) {
+                    nextLevelId = currentConfig.nextBranchId;
+                    console.log(`进入分支关卡: 从${oldLevelId}到${nextLevelId}`);
                     
-                    // 确保偏移量不超出范围
-                    if (bgOffsetX > scaledWidth - windowWidth) {
-                        bgOffsetX = Math.max(0, scaledWidth - windowWidth);
-                    }
-                    if (bgOffsetY > scaledHeight - windowHeight) {
-                        bgOffsetY = Math.max(0, scaledHeight - windowHeight);
+                    // 检查是否结束游戏
+                    if (nextLevelId === -1) {
+                        // 移除系统消息
+                        setTimeout(() => {
+                            endGame();
+                        }, 2000);
+                        return;
                     }
                     
-                    // 更新画布位置
-                    canvas.style.left = `-${bgOffsetX}px`;
-                    canvas.style.top = `-${bgOffsetY}px`;
+                    // 使用分支关卡图片
+                    currentBgImage.src = branchBgImage.src;
+                    
+                    // 移除系统消息
+                } else {
+                    nextLevelId = currentConfig.nextNormalId;
+                    console.log(`进入正常关卡: 从${oldLevelId}到${nextLevelId}`);
+                    
+                    // 检查是否结束游戏
+                    if (nextLevelId === -1) {
+                        // 移除系统消息
+                        setTimeout(() => {
+                            endGame();
+                        }, 2000);
+                        return;
+                    }
+                    
+                    // 使用正常关卡图片
+                    currentBgImage.src = nextBgImage.src;
+                    
+                    // 移除系统消息
                 }
-            }
-            
-            console.log(`切换到新关卡ID: ${currentLevelId}, 背景偏移: (${bgOffsetX}, ${bgOffsetY}), 焦距: ${zoomLevel}`);
-            
-            // 重置预加载状态
-            nextImageLoaded = false;
-            branchImageLoaded = false;
-            
-            // 重置红色矩形可见时间和UI
-            redRectVisibleTime = 0;
-            willEnterBranch = false;
-            redTimeIndicator.style.width = '0px';
-            redTimeIndicator.style.display = 'none';
-            branchIndicator.style.display = 'none';
-            
-            // 主动进行一次评论库状态检查，确保关卡切换后立即更新评论库
-            updateScoreBasedOnVisibility();
-            
-            // 确保更新UI显示正确的关卡ID
-            updateTimer();
-            
-            // 更新得分UI显示
-            updateScore();
-            
-            // 添加一波新评论，模拟观众对新场景的反应
-            setTimeout(() => {
-                // 快速添加3条评论
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        addNewComment();
-                    }, i * 300); // 每300ms添加一条
+                
+                // 其余场景切换逻辑保持不变
+                // 更新当前关卡ID
+                currentLevelId = nextLevelId;
+                console.log(`当前关卡ID已更新为: ${currentLevelId}, 关卡计数: ${levelCount}`);
+                console.log(`保持观看人数: ${viewerCount}, 商家声誉: ${merchantReputation}`);
+                
+                // 重置当前评论库到基础评论库
+                currentCommentTexts = commentTexts;
+                
+                // 测试一下这个关卡的评论库是否存在
+                const newLevelComments = levelComments[currentLevelId];
+                if (newLevelComments) {
+                    console.log(`已找到关卡${currentLevelId}的评论库:`, 
+                        `绿色评论库(${newLevelComments.green?.length || 0}条)`, 
+                        `红色评论库(${newLevelComments.red?.length || 0}条)`);
+                } else {
+                    console.warn(`警告: 未找到关卡${currentLevelId}的评论库配置`);
                 }
-            }, 500);
+                
+                // 更新画布大小（如果新图片尺寸不同）
+                bgWidth = currentBgImage.width;
+                bgHeight = currentBgImage.height;
+                canvas.width = bgWidth;
+                canvas.height = bgHeight;
+                
+                // 应用当前关卡的初始焦距和偏移量
+                if (levelConfigs[currentLevelId]) {
+                    // 先应用初始缩放
+                    if (levelConfigs[currentLevelId].initialZoom) {
+                        zoomLevel = levelConfigs[currentLevelId].initialZoom;
+                        // 更新滑块显示
+                        zoomSlider.value = zoomLevel * 100;
+                        zoomValueDisplay.textContent = zoomLevel.toFixed(1) + 'x';
+                        // 设置缩放
+                        canvas.style.transform = `scale(${zoomLevel})`;
+                        canvas.style.transformOrigin = 'top left';
+                    }
+                    
+                    // 计算缩放后的尺寸
+                    const scaledWidth = bgWidth * zoomLevel;
+                    const scaledHeight = bgHeight * zoomLevel;
+                    
+                    // 然后应用偏移量
+                    if (levelConfigs[currentLevelId].initialOffset) {
+                        // 计算考虑缩放的偏移量
+                        bgOffsetX = levelConfigs[currentLevelId].initialOffset.x * zoomLevel;
+                        bgOffsetY = levelConfigs[currentLevelId].initialOffset.y * zoomLevel;
+                        
+                        // 确保偏移量不超出范围
+                        if (bgOffsetX > scaledWidth - windowWidth) {
+                            bgOffsetX = Math.max(0, scaledWidth - windowWidth);
+                        }
+                        if (bgOffsetY > scaledHeight - windowHeight) {
+                            bgOffsetY = Math.max(0, scaledHeight - windowHeight);
+                        }
+                        
+                        // 更新画布位置
+                        canvas.style.left = `-${bgOffsetX}px`;
+                        canvas.style.top = `-${bgOffsetY}px`;
+                    }
+                }
+                
+                console.log(`切换到新关卡ID: ${currentLevelId}, 背景偏移: (${bgOffsetX}, ${bgOffsetY}), 焦距: ${zoomLevel}`);
+                
+                // 重置预加载状态
+                nextImageLoaded = false;
+                branchImageLoaded = false;
+                
+                // 重置红色矩形可见时间和UI
+                redRectVisibleTime = 0;
+                willEnterBranch = false;
+                redTimeIndicator.style.display = 'none';
+                branchIndicator.style.display = 'none';
+                
+                // 主动进行一次评论库状态检查，确保关卡切换后立即更新评论库
+                updateScoreBasedOnVisibility();
+                
+                // 确保更新UI显示正确的关卡ID
+                updateTimer();
+                
+                // 更新得分UI显示
+                updateScore();
+                
+                // 添加一波新评论，模拟观众对新场景的反应
+                setTimeout(() => {
+                    // 快速添加3条评论
+                    for (let i = 0; i < 3; i++) {
+                        setTimeout(() => {
+                            addNewComment();
+                        }, i * 300); // 每300ms添加一条
+                    }
+                }, 500);
+            });
         }
     }
     
@@ -965,17 +1095,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // 绘制当前背景图片
         ctx.drawImage(currentBgImage, 0, 0, bgWidth, bgHeight);
         
-        // 绘制绿色矩形
-        ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+        // 开发模式下可以取消注释以下代码来显示矩形（用于测试）
+        // 绘制绿色矩形（设置为完全透明，使其不可见）
+        // ctx.fillStyle = 'rgba(0, 255, 0, 0.6)'; // 注释掉可见的样式
+        ctx.fillStyle = 'rgba(0, 255, 0, 0)'; // 完全透明
         ctx.fillRect(greenRect.x, greenRect.y, greenRect.width, greenRect.height);
         
         // 检查当前关卡是否配置了红色矩形
         const currentConfig = levelConfigs[currentLevelId];
         const redRectEnabled = currentConfig && currentConfig.red !== undefined;
         
-        // 只在当前关卡配置了红色矩形的情况下才绘制红色矩形
+        // 只在当前关卡配置了红色矩形的情况下才绘制红色矩形（但设为透明）
         if (redRectEnabled) {
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.6)';
+            // ctx.fillStyle = 'rgba(255, 0, 0, 0.6)'; // 注释掉可见的样式
+            ctx.fillStyle = 'rgba(255, 0, 0, 0)'; // 完全透明
             ctx.fillRect(redRect.x, redRect.y, redRect.width, redRect.height);
         }
         
@@ -993,11 +1126,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         countdownInterval = setInterval(() => {
-            // 在调试模式下如果计时器暂停，不更新倒计时
-            if (isDebugMode && timerPaused) {
-                return;
-            }
-            
             if (timeLeft > 0 && !gameOver) {
                 timeLeft--;
                 updateTimer();
@@ -1028,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if ((currentConfig.nextNormalId === -1 && !willEnterBranch) || 
                     (willEnterBranch && currentConfig.nextBranchId !== undefined && currentConfig.nextBranchId === -1)) {
                     // 结束游戏并结算
-                    addSpecialComment("游戏结束，进行结算");
+                    // 移除系统消息
                     endGame();
                     return;
                 }
@@ -1048,8 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 更新UI以显示新的关卡ID
                 updateTimer();
                 
-                // 添加特殊评论提示关卡变化
-                addSpecialComment(`关卡${currentLevelId + 1}开始，观众${viewerCount}人在线`);
+                // 移除关卡变化的系统消息
                 
                 // 如果达到一定关卡数（例如15关），则结束游戏
                 if (levelCount >= 15) {
@@ -1074,7 +1201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 检查商家声誉是否降到0，如果是则结束游戏
                 if (merchantReputation <= 0) {
                     merchantReputation = 0; // 确保不会显示负数
-                    addSpecialComment("商家声誉降至0，直播中断！");
+                    // 移除系统消息
                     endGameWithReputationLoss();
                 }
             }
@@ -1100,6 +1227,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // 检查红色矩形是否在可见区域
         const redVisible = redRectEnabled && isRectVisible(redRect, visibleRegion);
         
+        // 添加绿色区域的视觉反馈
+        if (greenVisible) {
+            // 绿色矩形可见时添加微妙的绿色边框效果
+            document.getElementById('game-container').style.boxShadow = 'inset 0 0 20px rgba(0, 255, 0, 0.3)';
+        } else {
+            // 不在绿色区域时移除绿色边框
+            document.getElementById('game-container').style.boxShadow = '';
+        }
+        
+        // 添加红色区域的视觉反馈
+        if (redVisible) {
+            // 红色矩形可见时添加微妙的红色边框效果，优先级高于绿色
+            document.getElementById('game-container').style.boxShadow = 'inset 0 0 20px rgba(255, 0, 0, 0.3)';
+        }
+        
         // 根据可见情况更新观看人数和商家声誉
         if (greenVisible) {
             // 绿色矩形可见时，小幅增加观看人数和商家声誉
@@ -1111,11 +1253,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (merchantReputation > 100) {
                 merchantReputation = 100;
             }
-            
-            // 添加系统提示（较低频率）
-            if (Math.random() < 0.2) { // 20%概率
-                addSpecialComment(`👍 好内容！观看人数+${viewerIncrease}，声誉+1`);
-            }
         }
         
         if (redVisible) {
@@ -1123,22 +1260,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const viewerIncrease = Math.floor(Math.random() * 51) + 50; // 50~100人
             viewerCount += viewerIncrease;
             merchantReputation -= 5; // 每秒减少5点声誉
-            
-            // 添加系统提示（较低频率）
-            if (Math.random() < 0.2) { // 20%概率
-                addSpecialComment(`👀 争议内容！观看人数+${viewerIncrease}，声誉-5`);
-            }
         }
         
         // 如果两种矩形都不可见，则减少观看人数
         if (!greenVisible && !redVisible) {
             const viewerDecrease = Math.floor(Math.random() * 10) + 1; // 1~10人
             viewerCount = Math.max(0, viewerCount - viewerDecrease); // 不让观看人数低于0
-            
-            // 添加系统提示（较低频率）
-            if (Math.random() < 0.1 && viewerCount > 0) { // 10%概率
-                addSpecialComment(`😴 内容乏味！观看人数-${viewerDecrease}`);
-            }
         }
     }
     
@@ -1155,11 +1282,22 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(scoreUpdateInterval);
         }
         
-        // 添加游戏结束的系统消息
-        addSpecialComment(`游戏结束，最终观看人数: ${viewerCount}，商家声誉: ${merchantReputation}`);
+        // 移除游戏结束的系统消息
         
         // 显示游戏结束界面
-        finalScoreElement.innerHTML = `最终观看人数: <span style="color:#4CAF50">${viewerCount}</span><br>商家声誉: <span style="color:#2196F3">${merchantReputation}</span>`;
+        finalScoreElement.innerHTML = `
+            <div>
+                <div class="viewer-highlight">${viewerCount.toLocaleString()}</div>
+                <div style="font-size: 24px; margin-bottom: 20px;">人观看了您的直播</div>
+            </div>
+            <div style="margin: 15px 0; font-size: 20px;">
+                <span>商家声誉: </span>
+                <span style="color:${merchantReputation > 60 ? '#4CAF50' : merchantReputation > 30 ? '#FFC107' : '#F44336'}">${merchantReputation}</span>
+            </div>
+            <div style="margin-top: 10px;">
+                ${getStarsHTML(merchantReputation)}
+            </div>
+        `;
         gameOverElement.style.display = 'flex';
     }
     
@@ -1176,28 +1314,191 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(scoreUpdateInterval);
         }
         
-        // 添加游戏结束的系统消息
-        addSpecialComment("商家因声誉过低中断了直播！");
+        // 移除游戏结束的系统消息
         
         // 显示游戏结束界面
-        finalScoreElement.innerHTML = `<span style="color:red">商家中断了直播！</span><br>最终观看人数: <span style="color:#4CAF50">${viewerCount}</span><br>商家声誉: <span style="color:red">${merchantReputation}</span>`;
+        finalScoreElement.innerHTML = `
+            <div style="color:#FF6B6B; margin-bottom: 15px; font-size: 24px;">商家中断了直播！</div>
+            <div>
+                <div class="viewer-highlight">${viewerCount.toLocaleString()}</div>
+                <div style="font-size: 24px; margin-bottom: 20px;">人观看了您的直播</div>
+            </div>
+            <div style="margin: 15px 0; font-size: 20px;">
+                <span>商家声誉: </span>
+                <span style="color:#F44336">${merchantReputation}</span>
+            </div>
+            <div style="margin-top: 10px;">
+                ${getStarsHTML(merchantReputation)}
+            </div>
+        `;
         gameOverElement.style.display = 'flex';
     }
     
     // 更新得分
     function updateScore() {
-        scoreElement.innerHTML = `观看人数: <span style="color:#4CAF50">${viewerCount}</span> | 商家声誉: <span style="color:${merchantReputation > 30 ? '#2196F3' : 'red'}">${merchantReputation}</span>`;
+        // 记录当前的观众数
+        const previousViewerCount = parseInt(viewerCountElement.textContent) || 0;
+        
+        // 更新显示
+        viewerCountElement.textContent = `${viewerCount}人正在观看`;
+        updateReputationStars();
+        
+        // 获取可见区域信息
+        const visibleRegion = {
+            x: bgOffsetX / zoomLevel,
+            y: bgOffsetY / zoomLevel,
+            width: windowWidth / zoomLevel,
+            height: windowHeight / zoomLevel
+        };
+        
+        // 检查是否在特殊区域
+        const greenVisible = isRectVisible(greenRect, visibleRegion);
+        const currentConfig = levelConfigs[currentLevelId];
+        const redRectEnabled = currentConfig && currentConfig.red !== undefined;
+        const redVisible = redRectEnabled && isRectVisible(redRect, visibleRegion);
+        
+        // 根据当前所在区域修改观众计数的颜色
+        if (redVisible) {
+            // 红色区域显示红色
+            viewerCountElement.style.color = '#ff7777';
+        } else if (greenVisible) {
+            // 绿色区域显示绿色
+            viewerCountElement.style.color = '#77ff77';
+        } else {
+            // 普通区域显示白色
+            viewerCountElement.style.color = '#ffffff';
+        }
+        
+        // 检查观众数是否发生变化
+        if (previousViewerCount !== viewerCount && gameStarted && !gameOver) {
+            const diff = viewerCount - previousViewerCount;
+            
+            // 先移除可能存在的旧观众变化提示
+            const existingViewerNotice = document.getElementById('viewer-change-notice');
+            if (existingViewerNotice) {
+                existingViewerNotice.remove();
+            }
+            
+            if (diff > 0) {
+                // 增加了观众
+                if (diff >= 10) { // 只有增加超过10人时才显示消息
+                    // 创建观众变化提示
+                    const viewerNotice = document.createElement('div');
+                    viewerNotice.id = 'viewer-change-notice';
+                    viewerNotice.style.color = redVisible ? '#ff6666' : '#66ff66'; // 红色区域用红色，其他用绿色
+                    viewerNotice.style.fontSize = '14px';
+                    viewerNotice.style.marginTop = '5px';
+                    viewerNotice.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+                    viewerNotice.style.padding = '3px 5px';
+                    viewerNotice.style.borderRadius = '4px';
+                    viewerNotice.textContent = `+${diff}人加入了直播间`;
+                    
+                    // 插入到观看人数显示下方
+                    viewerCountElement.parentNode.insertBefore(viewerNotice, viewerCountElement.nextSibling);
+                    
+                    // 3秒后自动移除提示
+                    setTimeout(() => {
+                        if (viewerNotice.parentNode) {
+                            viewerNotice.remove();
+                        }
+                    }, 3000);
+                }
+            } else if (diff < 0) {
+                // 减少了观众
+                if (diff <= -10) { // 只有减少超过10人时才显示消息
+                    // 创建观众变化提示
+                    const viewerNotice = document.createElement('div');
+                    viewerNotice.id = 'viewer-change-notice';
+                    viewerNotice.style.color = '#ff6666'; // 红色
+                    viewerNotice.style.fontSize = '14px';
+                    viewerNotice.style.marginTop = '5px';
+                    viewerNotice.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+                    viewerNotice.style.padding = '3px 5px';
+                    viewerNotice.style.borderRadius = '4px';
+                    viewerNotice.textContent = `-${Math.abs(diff)}人离开了直播间`;
+                    
+                    // 插入到观看人数显示下方
+                    viewerCountElement.parentNode.insertBefore(viewerNotice, viewerCountElement.nextSibling);
+                    
+                    // 3秒后自动移除提示
+                    setTimeout(() => {
+                        if (viewerNotice.parentNode) {
+                            viewerNotice.remove();
+                        }
+                    }, 3000);
+                }
+            }
+        }
+    }
+    
+    // 更新商家声誉星级显示
+    function updateReputationStars() {
+        // 更新声誉数值
+        reputationValueElement.textContent = merchantReputation;
+        
+        // 根据声誉值设置颜色
+        if (merchantReputation > 60) {
+            reputationValueElement.style.color = '#4CAF50'; // 绿色，声誉好
+        } else if (merchantReputation > 30) {
+            reputationValueElement.style.color = '#FFC107'; // 黄色，声誉一般
+        } else {
+            reputationValueElement.style.color = '#F44336'; // 红色，声誉差
+        }
+        
+        // 计算星星数量（每20分1颗星）
+        const fullStarsCount = Math.floor(merchantReputation / 20);
+        
+        // 更新星星显示
+        const stars = starsContainer.querySelectorAll('.star');
+        for (let i = 0; i < stars.length; i++) {
+            if (i < fullStarsCount) {
+                stars[i].classList.remove('star-empty');
+            } else {
+                stars[i].classList.add('star-empty');
+            }
+        }
     }
     
     // 更新计时器
     function updateTimer() {
-        // 确保显示的关卡ID正确
-        timerElement.textContent = `时间: ${timeLeft} | 关卡: ${levelCount + 1} | ID: ${currentLevelId}`;
-        // 同时更新调试面板的关卡信息
-        if (levelInfoDisplay) {
-            levelInfoDisplay.textContent = `当前关卡: ${levelCount + 1} (ID: ${currentLevelId})`;
-        }
+        // 更新倒计时进度条
+        updateTimerProgress(timeLeft);
+        
+        // 记录日志
         console.log(`计时器更新 - 时间: ${timeLeft}, 关卡计数: ${levelCount}, 关卡ID: ${currentLevelId}`);
+    }
+    
+    // 更新倒计时进度条
+    function updateTimerProgress(seconds) {
+        // 时间范围通常为10秒
+        const maxTime = 10; 
+        const percentage = Math.min(Math.max(seconds / maxTime, 0), 1) * 100;
+        
+        // 根据时间剩余百分比计算颜色
+        let color;
+        if (percentage >= 60) {
+            // 绿色 (60%-100%)
+            color = 'rgba(0, 255, 0, 0.7)';
+        } else if (percentage >= 30) {
+            // 黄色 (30%-60%)
+            color = 'rgba(255, 255, 0, 0.7)';
+        } else {
+            // 红色 (0%-30%)
+            color = 'rgba(255, 0, 0, 0.7)';
+        }
+        
+        // 使用conic-gradient实现圆形进度条
+        timerProgressElement.style.background = 
+            `conic-gradient(${color} 0% ${percentage}%, rgba(0, 0, 0, 0.2) ${percentage}% 100%)`;
+        
+        // 给元素添加阴影效果，随颜色变化
+        if (percentage >= 60) {
+            timerProgressElement.style.boxShadow = 'inset 0 0 8px rgba(0, 255, 0, 0.5)';
+        } else if (percentage >= 30) {
+            timerProgressElement.style.boxShadow = 'inset 0 0 8px rgba(255, 255, 0, 0.5)';
+        } else {
+            timerProgressElement.style.boxShadow = 'inset 0 0 8px rgba(255, 0, 0, 0.5)';
+        }
     }
     
     // 根据矩形的可见性更新得分和检查红色矩形的可见时间
@@ -1246,41 +1547,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 增加红色矩形可见时间计数
                 redRectVisibleTime += 1/60; // 假设游戏以约60FPS运行
                 
-                // 更新红色时间指示器
-                redTimeIndicator.style.display = 'block';
-                const indicatorWidth = Math.min(redRectVisibleTime * 40, 200); // 5秒到达最大宽度
-                redTimeIndicator.style.width = `${indicatorWidth}px`;
-                
                 // 检查是否有分支路径配置
                 const hasBranchPath = currentConfig.nextBranchId !== undefined;
                 
                 // 如果红色矩形可见超过5秒，并且当前关卡有分支配置，标记将进入分支关卡
                 if (redRectVisibleTime >= 5 && !willEnterBranch && hasBranchPath) {
                     willEnterBranch = true;
-                    // 显示提示，将进入分支关卡
-                    branchIndicator.style.display = 'block';
-                    sceneTransitionElement.textContent = "注意! 即将进入分支关卡!";
-                    showSceneTransition();
-                    sceneTransitionElement.textContent = "即将切换到新场景!"; // 恢复原来的提示文本
-                    
-                    // 生成一条相关评论
-                    addSpecialComment("分支路径已触发");
                 }
             } else {
                 // 如果红色矩形不可见，重置计时
                 redRectVisibleTime = 0;
-                redTimeIndicator.style.width = '0px';
-                redTimeIndicator.style.display = 'none';
             }
         } else {
             // 如果当前关卡没有红色矩形配置，确保红色指示器和分支标记都不显示
             redRectVisibleTime = 0;
-            redTimeIndicator.style.width = '0px';
-            redTimeIndicator.style.display = 'none';
-            // 不显示分支指示器
-            if (branchIndicator) {
-                branchIndicator.style.display = 'none';
-            }
         }
         
         // 如果绿色矩形不可见，并且没有红色矩形或红色矩形不可见，使用默认评论库
@@ -1475,48 +1755,41 @@ document.addEventListener('DOMContentLoaded', () => {
         nextLevelId = 1;
         viewerCount = 0;     // 重置观看人数
         merchantReputation = 100; // 重置商家声誉
+        firstLaunch = true;  // 重新启用开始屏幕
         
         console.log(`游戏重启 - 关卡ID重置为: ${currentLevelId}`);
         
-        // 不要清除评论，只添加一条重新开始的系统消息
-        // 如果有评论定时器，不要清除它
+        // 隐藏游戏结束界面
+        gameOverElement.style.display = 'none';
         
         // 重新加载第一张背景图片
         currentBgImage.src = levelConfigs[currentLevelId].bgImage;
-        currentBgImage.onload = function() {
-            bgWidth = currentBgImage.width;
-            bgHeight = currentBgImage.height;
-            initGame();
-        };
     });
     
     // 添加特殊评论（系统提示或特殊事件相关）
     function addSpecialComment(message) {
         // 创建评论元素
         const commentElement = document.createElement('div');
-        commentElement.className = 'comment';
+        commentElement.className = 'comment system-comment';
+        commentElement.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+        commentElement.style.padding = '3px 5px';
+        commentElement.style.borderRadius = '4px';
+        commentElement.style.marginBottom = '8px';
         
-        // 创建用户名元素（系统消息）
-        const usernameElement = document.createElement('span');
-        usernameElement.className = 'username';
-        usernameElement.style.color = '#00ccff'; // 系统消息使用不同颜色
-        usernameElement.textContent = '系统消息:';
-        commentElement.appendChild(usernameElement);
-        
-        // 创建评论文本元素
+        // 创建评论文本元素（不再有系统消息前缀）
         const textElement = document.createElement('span');
         textElement.className = 'text';
         textElement.textContent = message;
         commentElement.appendChild(textElement);
         
-        // 添加到评论列表
+        // 添加到评论列表的底部（而不是顶部）
         commentsListElement.appendChild(commentElement);
         
         // 将新评论添加到活跃评论数组
         activeComments.push(commentElement);
         
-        // 如果评论超过10条，移除最旧的
-        if (activeComments.length > 10) {
+        // 如果评论超过8条，移除最旧的
+        if (activeComments.length > 8) {
             const oldestComment = activeComments.shift();
             if (oldestComment.parentNode === commentsListElement) {
                 commentsListElement.removeChild(oldestComment);
@@ -1529,164 +1802,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     }
     
-    // 调试模式功能
-
-    // 切换调试模式
-    function toggleDebugMode() {
-        isDebugMode = !isDebugMode;
+    // 获取星星HTML
+    function getStarsHTML(reputation) {
+        const fullStarsCount = Math.floor(reputation / 20);
+        let starsHTML = '';
         
-        if (isDebugMode) {
-            // 启用调试模式
-            debugPanel.style.display = 'block';
-            debugToggleButton.textContent = '关闭调试';
-            debugToggleButton.style.backgroundColor = 'rgba(204, 0, 0, 0.7)';
-            timerPaused = true; // 进入调试模式时暂停计时器
-            addSpecialComment("已进入调试模式，计时器已暂停");
-        } else {
-            // 禁用调试模式
-            debugPanel.style.display = 'none';
-            debugToggleButton.textContent = '调试模式';
-            debugToggleButton.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-            // 退出调试模式不自动恢复计时器，需手动点击恢复按钮
-            addSpecialComment("已退出调试模式");
-        }
-        
-        // 更新UI显示
-        updateTimer();
-    }
-    
-    // 切换到上一关
-    function goToPrevLevel() {
-        // 确保不会超出关卡范围
-        if (currentLevelId > 0) {
-            // 设置新的关卡ID
-            currentLevelId--;
-            addSpecialComment(`调试: 切换至关卡ID ${currentLevelId}`);
-            
-            // 加载新关卡背景
-            currentBgImage.src = levelConfigs[currentLevelId].bgImage;
-            currentBgImage.onload = function() {
-                bgWidth = currentBgImage.width;
-                bgHeight = currentBgImage.height;
-                
-                // 设置新关卡
-                canvas.width = bgWidth;
-                canvas.height = bgHeight;
-                
-                // 应用新关卡的初始缩放和偏移量
-                applyLevelSettings(currentLevelId);
-                
-                // 设置矩形位置
-                setRectanglePositions(currentLevelId);
-                
-                // 更新UI
-                updateTimer();
-                
-                // 重新开始游戏循环
-                if (!gameOver) {
-                    requestAnimationFrame(gameLoop);
-                }
-            };
-        } else {
-            addSpecialComment("已经是第一关，无法切换到上一关");
-        }
-    }
-    
-    // 切换到下一关
-    function goToNextLevel() {
-        // 确保不会超出关卡范围
-        if (currentLevelId < levelConfigs.length - 1) {
-            // 设置新的关卡ID
-            currentLevelId++;
-            addSpecialComment(`调试: 切换至关卡ID ${currentLevelId}`);
-            
-            // 加载新关卡背景
-            currentBgImage.src = levelConfigs[currentLevelId].bgImage;
-            currentBgImage.onload = function() {
-                bgWidth = currentBgImage.width;
-                bgHeight = currentBgImage.height;
-                
-                // 设置新关卡
-                canvas.width = bgWidth;
-                canvas.height = bgHeight;
-                
-                // 应用新关卡的初始缩放和偏移量
-                applyLevelSettings(currentLevelId);
-                
-                // 设置矩形位置
-                setRectanglePositions(currentLevelId);
-                
-                // 更新UI
-                updateTimer();
-                
-                // 重新开始游戏循环
-                if (!gameOver) {
-                    requestAnimationFrame(gameLoop);
-                }
-            };
-        } else {
-            addSpecialComment("已经是最后一关，无法切换到下一关");
-        }
-    }
-    
-    // 恢复计时器
-    function resumeTimer() {
-        if (isDebugMode && timerPaused) {
-            timerPaused = false;
-            addSpecialComment("计时器已恢复");
-        }
-    }
-    
-    // 应用关卡设置（缩放和偏移量）
-    function applyLevelSettings(levelId) {
-        const config = levelConfigs[levelId];
-        
-        // 应用缩放
-        if (config && config.initialZoom) {
-            zoomLevel = config.initialZoom;
-            zoomSlider.value = zoomLevel * 100;
-            zoomValueDisplay.textContent = zoomLevel.toFixed(1) + 'x';
-            canvas.style.transform = `scale(${zoomLevel})`;
-            canvas.style.transformOrigin = 'top left';
-        } else {
-            zoomLevel = 1.0;
-            zoomSlider.value = 100;
-            zoomValueDisplay.textContent = '1.0x';
-            canvas.style.transform = 'scale(1)';
-            canvas.style.transformOrigin = 'top left';
-        }
-        
-        // 计算缩放后的尺寸
-        const scaledWidth = bgWidth * zoomLevel;
-        const scaledHeight = bgHeight * zoomLevel;
-        
-        // 应用偏移量
-        if (config && config.initialOffset) {
-            bgOffsetX = config.initialOffset.x * zoomLevel;
-            bgOffsetY = config.initialOffset.y * zoomLevel;
-            
-            // 确保偏移量不超出范围
-            if (bgOffsetX > scaledWidth - windowWidth) {
-                bgOffsetX = Math.max(0, scaledWidth - windowWidth);
+        for (let i = 0; i < 5; i++) {
+            if (i < fullStarsCount) {
+                starsHTML += '<span style="color: #ffcc00; font-size: 32px; margin: 0 5px; text-shadow: 0 0 10px rgba(255, 204, 0, 0.6);">★</span>';
+            } else {
+                starsHTML += '<span style="color: rgba(255, 255, 255, 0.2); font-size: 32px; margin: 0 5px;">★</span>';
             }
-            if (bgOffsetY > scaledHeight - windowHeight) {
-                bgOffsetY = Math.max(0, scaledHeight - windowHeight);
-            }
-            
-            // 更新画布位置
-            canvas.style.left = `-${bgOffsetX}px`;
-            canvas.style.top = `-${bgOffsetY}px`;
-        } else {
-            bgOffsetX = 0;
-            bgOffsetY = 0;
-            canvas.style.left = '0px';
-            canvas.style.top = '0px';
         }
+        
+        return starsHTML;
     }
-    
-    // 调试模式按钮事件监听
-    debugToggleButton.addEventListener('click', toggleDebugMode);
-    prevLevelButton.addEventListener('click', goToPrevLevel);
-    nextLevelButton.addEventListener('click', goToNextLevel);
-    resumeTimerButton.addEventListener('click', resumeTimer);
 }); 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>直播模拟器</title>
+    <title>拯救直播</title>
     <style>
         body {
             margin: 0;
@@ -36,6 +36,51 @@
             text-shadow: 1px 1px 2px black;
             font-size: 24px;
             pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        #viewer-count {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
+        #timer-pie {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            z-index: 10;
+            pointer-events: none;
+            background-color: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        #timer-progress {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: conic-gradient(rgba(0, 255, 0, 0.7) 0%, transparent 0%);
+            transition: background 0.1s linear;
+            box-shadow: inset 0 0 8px rgba(0, 255, 0, 0.5);
+        }
+        #timer-progress::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.2);
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
         }
         #red-time-indicator {
             position: absolute;
@@ -61,19 +106,20 @@
         }
         #scene-transition {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             color: white;
             font-size: 30px;
             font-weight: bold;
-            background-color: rgba(0, 0, 0, 0.6);
-            padding: 20px;
-            border-radius: 10px;
+            background-color: rgba(0, 0, 0, 1);
             display: none;
             z-index: 15;
             text-align: center;
             pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
         }
         #game-over {
             position: absolute;
@@ -81,7 +127,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
+            background-color: rgba(0, 0, 0, 0.85);
             color: white;
             display: flex;
             flex-direction: column;
@@ -89,27 +135,59 @@
             align-items: center;
             z-index: 20;
             display: none;
+            text-align: center;
         }
+        
+        #game-over h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            color: #FF6B6B;
+        }
+        
+        #final-score {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            min-width: 300px;
+            margin-bottom: 25px;
+        }
+        
+        .viewer-highlight {
+            font-size: 56px !important;
+            font-weight: bold;
+            color: #4CAF50;
+            display: block;
+            margin: 15px 0;
+            text-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+        }
+        
         #restart-btn {
             margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
+            padding: 12px 30px;
+            font-size: 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 30px;
             cursor: pointer;
             pointer-events: auto;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
         }
+        
         #restart-btn:hover {
             background-color: #45a049;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
         }
         #comments-container {
             position: absolute;
             bottom: 10px;
             left: 10px;
-            width: 300px;
-            height: 200px;
+            width: 240px;
+            height: 140px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 10px;
             overflow: hidden;
@@ -124,12 +202,12 @@
             overflow: hidden;
         }
         .comment {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             transition: transform 0.3s ease-out;
             color: white;
-            font-size: 14px;
+            font-size: 13px;
             text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
-            line-height: 1.2;
+            line-height: 1.1;
         }
         .comment .username {
             color: #ffcc00;
@@ -138,6 +216,49 @@
         }
         .comment .text {
             word-break: break-word;
+        }
+        #reputation-container {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 10px;
+            z-index: 10;
+            pointer-events: none;
+            width: 120px;
+            height: 140px;
+            justify-content: center;
+        }
+        #reputation-label {
+            color: white;
+            font-size: 16px;
+            margin-bottom: 8px;
+            text-shadow: 1px 1px 2px black;
+        }
+        #reputation-value {
+            color: white;
+            font-size: 42px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+            margin-bottom: 5px;
+        }
+        #stars-container {
+            display: flex;
+            margin-top: 5px;
+            justify-content: center;
+        }
+        .star {
+            color: #ffcc00;
+            font-size: 24px;
+            margin: 0 2px;
+            text-shadow: 0 0 3px rgba(0,0,0,0.8);
+        }
+        .star-empty {
+            color: rgba(255, 255, 255, 0.3) !important;
         }
         #zoom-slider-container {
             position: fixed;
@@ -201,68 +322,106 @@
             font-size: 12px;
             margin: 5px 0;
         }
-        #debug-panel {
-            position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
+        /* 移除旧的饼图元素样式 */
+        .pie-fill, .pie-center {
             display: none;
-            z-index: 30;
-            text-align: center;
         }
-        #debug-panel button {
-            margin: 0 5px;
-            padding: 5px 10px;
+        
+        /* 开始游戏按钮和屏幕样式 */
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        #start-screen h1 {
+            color: white;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        #game-rules {
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 30px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+        
+        #game-rules p {
+            margin: 10px 0;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+        
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 24px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 3px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
         }
-        #debug-panel button:hover {
+        
+        #start-btn:hover {
             background-color: #45a049;
-        }
-        #debug-toggle {
-            position: fixed;
-            top: 10px;
-            right: 70px;
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
-            border: none;
-            border-radius: 3px;
-            padding: 5px 10px;
-            cursor: pointer;
-            z-index: 30;
-        }
-        #debug-toggle:hover {
-            background-color: rgba(0, 0, 0, 0.7);
-        }
-        #level-info {
-            color: white;
-            margin-bottom: 10px;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.7);
         }
     </style>
 </head>
 <body>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
-        <div id="ui-container">
-            <div id="score">得分: 0</div>
-            <div id="timer">时间: 15 | 关卡: 1 | ID: 0</div>
+        
+        <!-- 开始游戏屏幕 -->
+        <div id="start-screen">
+            <h1>拯救直播</h1>
+            <div id="game-rules">
+                <p>1. 你是一名美食主播————的跟拍师！</p>
+                <p>2. 拖拽画面，调整焦距，捕捉吸引流量的画面！</p>
+                <p>3. 注意网友评论，别让商家声誉扫地！</p>
+            </div>
+            <button id="start-btn">开始游戏</button>
         </div>
-        <button id="debug-toggle">调试模式</button>
-        <div id="debug-panel">
-            <div id="level-info">当前关卡: 1 (ID: 0)</div>
-            <button id="prev-level">上一关</button>
-            <button id="next-level">下一关</button>
-            <button id="resume-timer">恢复计时</button>
+        
+        <div id="ui-container">
+            <div id="viewer-count">0人正在观看</div>
         </div>
         <div id="branch-indicator">即将进入分支路径!</div>
         <div id="red-time-indicator"></div>
-        <div id="scene-transition">即将切换到新场景!</div>
+        <div id="scene-transition"></div>
+        
+        <!-- 中心倒计时饼图 -->
+        <div id="timer-pie">
+            <div id="timer-progress"></div>
+        </div>
+        
+        <!-- 商家声誉区域 -->
+        <div id="reputation-container">
+            <div id="reputation-label">商家声誉</div>
+            <div id="reputation-value">100</div>
+            <div id="stars-container">
+                <span class="star">★</span>
+                <span class="star">★</span>
+                <span class="star">★</span>
+                <span class="star">★</span>
+                <span class="star">★</span>
+            </div>
+        </div>
+        
         <div id="zoom-slider-container">
             <div id="zoom-value">1.0x</div>
             <div id="zoom-label-max">2x</div>
@@ -273,7 +432,7 @@
             <div id="comments-list"></div>
         </div>
         <div id="game-over">
-            <h1>游戏结束!</h1>
+            <h1>直播结束!</h1>
             <h2 id="final-score">最终得分: 0</h2>
             <button id="restart-btn">再玩一次</button>
         </div>
